@@ -23,9 +23,18 @@ export default tseslint.config(
       '@typescript-eslint/no-explicit-any': 'error',
       '@typescript-eslint/prefer-nullish-coalescing': 'error',
       '@typescript-eslint/prefer-optional-chain': 'error',
+      '@typescript-eslint/no-non-null-assertion': 'off',
+      '@typescript-eslint/restrict-template-expressions': 'off',
     },
   },
   {
-    ignores: ['dist/**', 'node_modules/**', '*.js'],
+    files: ['src/__tests__/**'],
+    rules: {
+      '@typescript-eslint/explicit-function-return-type': 'off',
+      '@typescript-eslint/require-await': 'off',
+    },
+  },
+  {
+    ignores: ['dist/**', 'node_modules/**', 'examples/**', '*.js', 'vitest.config.ts'],
   }
 );
