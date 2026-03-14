@@ -1,0 +1,27 @@
+{
+  "name": "@d13co/algo-metrics-sdk",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Sliding window of Algorand block timestamps and transaction counters",
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@algorandfoundation/algokit-utils": "^9.2.0",
+    "abel-ghost-sdk": "^0.0.7",
+    "algosdk": "^3.5.2"
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "name": "@d13co/algo-metrics-react",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "React hooks for @d13co/algo-metrics-sdk",
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@d13co/algo-metrics-sdk": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": "^18.0.0 || ^19.0.0"
+  }
+}

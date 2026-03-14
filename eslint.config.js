@@ -10,7 +10,7 @@ export default tseslint.config(
   {
     languageOptions: {
       parserOptions: {
-        project: true,
+        project: ['./packages/*/tsconfig.json'],
         tsconfigRootDir: import.meta.dirname,
       },
     },
@@ -28,13 +28,13 @@ export default tseslint.config(
     },
   },
   {
-    files: ['src/__tests__/**'],
+    files: ['packages/*/src/__tests__/**'],
     rules: {
       '@typescript-eslint/explicit-function-return-type': 'off',
       '@typescript-eslint/require-await': 'off',
     },
   },
   {
-    ignores: ['dist/**', 'node_modules/**', 'examples/**', '*.js', 'vitest.config.ts'],
+    ignores: ['**/dist/**', 'node_modules/**', 'examples/**', '*.js', 'vitest.config.ts'],
   }
 );
