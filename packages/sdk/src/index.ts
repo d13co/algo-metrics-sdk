@@ -1,15 +1,30 @@
 import { AlgorandClient } from '@algorandfoundation/algokit-utils';
 import { AbelGhostSDK } from 'abel-ghost-sdk';
 import type { BlockRoundTimeAndTc } from 'abel-ghost-sdk';
+import type { modelsv2 } from 'algosdk';
 import { delay, mergeIntoCache, MAX_BLOCK_RANGE, ERROR_RETRY_DELAY_MS } from './utils.js';
 
 export type { BlockRoundTimeAndTc } from 'abel-ghost-sdk';
 
-export type TsTcWatcherCallback = (data: BlockRoundTimeAndTc[]) => void;
+export type TsTcWatcherSimpleCallback = (data: BlockRoundTimeAndTc[]) => void;
+export type TsTcWatcherBlockCallback = (
+  data: BlockRoundTimeAndTc[],
+  lastBlock: modelsv2.BlockResponse
+) => void;
+export type TsTcWatcherCallback = TsTcWatcherSimpleCallback | TsTcWatcherBlockCallback;
+
+export type RegisterTsTcWatcherOptions =
+  | { numBlocks?: number; includeBlock?: false }
+  | { numBlocks?: number; includeBlock: true };
 
 export type AlgoMetricsSDKOptions =
   | { abelGhostSDK: AbelGhostSDK }
   | { algorand?: AlgorandClient; ghostAppId?: bigint };
+
+interface WatcherEntry {
+  numBlocks: number;
+  includeBlock: boolean;
+}
 
 /**
  * Provides a sliding window of Algorand block timestamps and transaction counters.
@@ -24,7 +39,7 @@ export class AlgoMetricsSDK {
   public abelGhostSDK: AbelGhostSDK;
 
   private cache: BlockRoundTimeAndTc[] = [];
-  private watchers: Map<TsTcWatcherCallback, number> = new Map();
+  private watchers: Map<TsTcWatcherCallback, WatcherEntry> = new Map();
   private watcherLoopRunning = false;
 
   /**
@@ -66,18 +81,29 @@ export class AlgoMetricsSDK {
    * The callback is invoked immediately with current data, then again each time a new block arrives.
    * Starts the internal watcher loop if not already running.
    *
-   * @param callback - Receives an array of `BlockRoundTimeAndTc` for the most recent `blockRange` blocks.
-   * @param blockRange - Size of the sliding window (max 1000).
-   * @throws If `blockRange` exceeds 1000.
+   * @param callback - Receives block data. With `includeBlock: true`, also receives the full block response.
+   * @param options - Configuration for the watcher.
+   * @param options.numBlocks - Size of the sliding window (max 1000, default 1000).
+   * @param options.includeBlock - When true, the callback receives the full `BlockResponse` as a second argument on each new block.
+   * @throws If `numBlocks` exceeds 1000.
    */
   async registerTsTcWatcher(
+    callback: TsTcWatcherSimpleCallback,
+    options?: { numBlocks?: number; includeBlock?: false }
+  ): Promise<void>;
+  async registerTsTcWatcher(
+    callback: TsTcWatcherBlockCallback,
+    options: { numBlocks?: number; includeBlock: true }
+  ): Promise<void>;
+  async registerTsTcWatcher(
     callback: TsTcWatcherCallback,
-    blockRange = MAX_BLOCK_RANGE
+    options: RegisterTsTcWatcherOptions = {}
   ): Promise<void> {
-    if (blockRange > MAX_BLOCK_RANGE) {
-      throw new Error(`blockRange must be <= ${MAX_BLOCK_RANGE}`);
+    const { numBlocks = MAX_BLOCK_RANGE, includeBlock = false } = options;
+    if (numBlocks > MAX_BLOCK_RANGE) {
+      throw new Error(`numBlocks must be <= ${MAX_BLOCK_RANGE}`);
     }
-    this.watchers.set(callback, blockRange);
+    this.watchers.set(callback, { numBlocks, includeBlock });
 
     // Cache freshness is guaranteed by two paths:
     // 1. Loop not running: startWatcherLoop → watcherLoop init backfills from algod
@@ -88,9 +114,9 @@ export class AlgoMetricsSDK {
     }
 
     // Loop already running — backfill if cache has fewer entries than requested
-    if (blockRange > this.cache.length) {
+    if (numBlocks > this.cache.length) {
       const { lastRound } = await this.algorand.client.algod.status().do();
-      const firstRound = lastRound - BigInt(blockRange);
+      const firstRound = lastRound - BigInt(numBlocks);
       const backfill = await this.abelGhostSDK.getBlockTimesAndTc(firstRound, lastRound);
       this.cache = mergeIntoCache(this.cache, backfill);
       if (this.cache.length > MAX_BLOCK_RANGE) {
@@ -100,7 +126,7 @@ export class AlgoMetricsSDK {
 
     if (this.cache.length > 0) {
       try {
-        callback(this.cache.slice(-blockRange));
+        (callback as TsTcWatcherSimpleCallback)(this.cache.slice(-numBlocks));
       } catch (err) {
         console.error('AlgoMetricsSDK watcher callback error:', err);
       }
@@ -125,7 +151,7 @@ export class AlgoMetricsSDK {
   private async watcherLoop(): Promise<void> {
     try {
       // Init phase: backfill cache
-      const maxRange = Math.max(...Array.from(this.watchers.values()));
+      const maxRange = Math.max(...Array.from(this.watchers.values()).map((w) => w.numBlocks));
       const { lastRound } = await this.algorand.client.algod.status().do();
       const firstRound = lastRound - BigInt(maxRange);
 
@@ -162,7 +188,11 @@ export class AlgoMetricsSDK {
 
           if (this.watchers.size === 0) break;
 
-          const blockResp = await this.algorand.client.algod.block(newRound).headerOnly(true).do();
+          const needsBlock = [...this.watchers.values()].some((w) => w.includeBlock);
+          const blockResp = await this.algorand.client.algod
+            .block(newRound)
+            .headerOnly(!needsBlock)
+            .do();
 
           this.cache.push({
             rnd: blockResp.block.header.round,
@@ -174,7 +204,7 @@ export class AlgoMetricsSDK {
             this.cache = this.cache.slice(-MAX_BLOCK_RANGE);
           }
 
-          this.deliverToWatchers();
+          this.deliverToWatchers(blockResp);
           latestRound = newRound;
         } catch (err) {
           console.error('AlgoMetricsSDK watcherLoop error:', err);
@@ -189,10 +219,15 @@ export class AlgoMetricsSDK {
     this.watcherLoopRunning = false;
   }
 
-  private deliverToWatchers(): void {
-    for (const [callback, blockRange] of this.watchers) {
+  private deliverToWatchers(lastBlock?: modelsv2.BlockResponse): void {
+    for (const [callback, entry] of this.watchers) {
       try {
-        callback(this.cache.slice(-blockRange));
+        const slice = this.cache.slice(-entry.numBlocks);
+        if (entry.includeBlock && lastBlock) {
+          (callback as TsTcWatcherBlockCallback)(slice, lastBlock);
+        } else {
+          (callback as TsTcWatcherSimpleCallback)(slice);
+        }
       } catch (err) {
         console.error('AlgoMetricsSDK watcher callback error:', err);
       }

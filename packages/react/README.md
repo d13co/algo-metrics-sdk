@@ -48,10 +48,9 @@ function Dashboard() {
 | --- | --- | --- | --- |
 | `options` | `AlgoMetricsSDKOptions` | `{}` | Options forwarded to `new AlgoMetricsSDK(options)` |
 | `sdk` | `AlgoMetricsSDK` | — | Use an existing SDK instance instead of creating one |
-| `isMainnet` | `boolean` | `true` | Whether to apply the mainnet transaction count offset |
 | `children` | `ReactNode` | — | — |
 
-The provider registers a single watcher callback on mount and unregisters on unmount. All hooks derive their values from the shared block data via context.
+The provider registers a single watcher callback on mount and unregisters on unmount. It auto-detects whether the connected network is mainnet by comparing the genesis hash from `algod.getTransactionParams()`. All hooks derive their values from the shared block data via context.
 
 ## Hooks
 
@@ -92,7 +91,7 @@ import { getLatestRound, getAverageRoundTime, getTransactionsPerSecond, getTrans
 ```tsx
 import { AlgorandClient } from '@algorandfoundation/algokit-utils';
 
-<AlgoMetricsProvider options={{ algorand: AlgorandClient.testNet() }} isMainnet={false}>
+<AlgoMetricsProvider options={{ algorand: AlgorandClient.testNet() }}>
   {children}
 </AlgoMetricsProvider>
 ```

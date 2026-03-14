@@ -19,6 +19,15 @@
     "build": "tsc"
   },
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:d13co/algo-metrics-sdk.git",
+    "directory": "packages/react"
+  },
+  "bugs": {
+    "url": "https://github.com/d13co/algo-metrics-sdk/issues"
+  },
+  "homepage": "https://github.com/d13co/algo-metrics-sdk/tree/main/packages/react#readme",
   "dependencies": {
     "@d13co/algo-metrics-sdk": "workspace:*"
   },

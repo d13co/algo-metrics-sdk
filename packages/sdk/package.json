@@ -19,6 +19,15 @@
     "build": "tsc"
   },
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:d13co/algo-metrics-sdk.git",
+    "directory": "packages/sdk"
+  },
+  "bugs": {
+    "url": "https://github.com/d13co/algo-metrics-sdk/issues"
+  },
+  "homepage": "https://github.com/d13co/algo-metrics-sdk/tree/main/packages/sdk#readme",
   "dependencies": {
     "@algorandfoundation/algokit-utils": "^9.2.0",
     "abel-ghost-sdk": "^0.0.7",

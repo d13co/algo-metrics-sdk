@@ -1,6 +1,6 @@
 import { AlgoMetricsSDK, type BlockRoundTimeAndTc } from '@d13co/algo-metrics-sdk';
 
-const blockRange = Number(process.argv[2]) || 200;
+const numBlocks = Number(process.argv[2]) || 200;
 
 const sdk = new AlgoMetricsSDK();
 
@@ -19,8 +19,8 @@ function onBlockData(blocks: BlockRoundTimeAndTc[]): void {
   console.log(`[${blocks.length} blocks] round ${last.rnd} | avg TPS: ${avgTps} | avg round time: ${avgRoundTime}s`);
 }
 
-// Watch a sliding window of blockRange blocks
-await sdk.registerTsTcWatcher(onBlockData, blockRange);
+// Watch a sliding window of numBlocks blocks
+await sdk.registerTsTcWatcher(onBlockData, { numBlocks });
 
 // Unregister after 30 seconds
 setTimeout(() => {

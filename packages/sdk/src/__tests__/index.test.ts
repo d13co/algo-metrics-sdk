@@ -17,6 +17,7 @@ function makeBlocks(first: number, last: number): BlockRoundTimeAndTc[] {
 function createMockAlgod(lastRound: bigint) {
   let currentRound = lastRound;
   const statusAfterBlockResolvers: Array<(v: { lastRound: bigint }) => void> = [];
+  const headerOnlyCalls: boolean[] = [];
 
   return {
     status: () => ({ do: vi.fn(async () => ({ lastRound: currentRound })) }),
@@ -29,24 +30,29 @@ function createMockAlgod(lastRound: bigint) {
       ),
     }),
     block: (round: number | bigint) => ({
-      headerOnly: (_v: boolean) => ({
-        do: vi.fn(async () => ({
-          block: {
-            header: {
-              round: BigInt(round),
-              timestamp: BigInt(Number(round)),
-              txnCounter: BigInt(Number(round) * 10),
+      headerOnly: (v: boolean) => {
+        headerOnlyCalls.push(v);
+        return {
+          do: vi.fn(async () => ({
+            block: {
+              header: {
+                round: BigInt(round),
+                timestamp: BigInt(Number(round)),
+                txnCounter: BigInt(Number(round) * 10),
+              },
+              payset: [],
             },
-          },
-        })),
-      }),
+          })),
+        };
+      },
     }),
-    // Test helper: resolve the pending statusAfterBlock call
+    // Test helpers
     _resolveNextBlock: () => {
       currentRound = currentRound + 1n;
       const resolver = statusAfterBlockResolvers.shift();
       resolver?.({ lastRound: currentRound });
     },
+    _headerOnlyCalls: headerOnlyCalls,
   };
 }
 
@@ -109,10 +115,10 @@ describe('AlgoMetricsSDK', () => {
   });
 
   describe('registerTsTcWatcher / unregisterTsTcWatcher', () => {
-    it('throws if blockRange > 1000', async () => {
+    it('throws if numBlocks > 1000', async () => {
       const { sdk } = createMockSDK(1000n);
-      await expect(sdk.registerTsTcWatcher(vi.fn(), 1001)).rejects.toThrow(
-        'blockRange must be <= 1000'
+      await expect(sdk.registerTsTcWatcher(vi.fn(), { numBlocks: 1001 })).rejects.toThrow(
+        'numBlocks must be <= 1000'
       );
     });
 
@@ -123,7 +129,7 @@ describe('AlgoMetricsSDK', () => {
         received.push(data);
       });
 
-      await sdk.registerTsTcWatcher(callback, 10);
+      await sdk.registerTsTcWatcher(callback, { numBlocks: 10 });
 
       // Allow the async watcherLoop init to complete
       await vi.waitFor(() => {
@@ -143,7 +149,7 @@ describe('AlgoMetricsSDK', () => {
         calls.push([...data]);
       });
 
-      await sdk.registerTsTcWatcher(callback, 5);
+      await sdk.registerTsTcWatcher(callback, { numBlocks: 5 });
 
       await vi.waitFor(() => {
         expect(callback).toHaveBeenCalled();
@@ -171,7 +177,7 @@ describe('AlgoMetricsSDK', () => {
         throw new Error('callback boom');
       });
 
-      await sdk.registerTsTcWatcher(badCallback, 5);
+      await sdk.registerTsTcWatcher(badCallback, { numBlocks: 5 });
 
       await vi.waitFor(() => {
         expect(badCallback).toHaveBeenCalled();
@@ -190,8 +196,8 @@ describe('AlgoMetricsSDK', () => {
       const { sdk, algod, mockAbelGhostSDK } = createMockSDK(100n);
       const callback = vi.fn();
 
-      // Register with blockRange=5, wait for init
-      await sdk.registerTsTcWatcher(callback, 5);
+      // Register with numBlocks=5, wait for init
+      await sdk.registerTsTcWatcher(callback, { numBlocks: 5 });
       await vi.waitFor(() => {
         expect(callback).toHaveBeenCalled();
       });
@@ -213,8 +219,8 @@ describe('AlgoMetricsSDK', () => {
       callback.mockClear();
       mockAbelGhostSDK.getBlockTimesAndTc.mockClear();
 
-      // Re-register with a larger blockRange — should backfill including missed blocks
-      await sdk.registerTsTcWatcher(callback, 20);
+      // Re-register with a larger numBlocks — should backfill including missed blocks
+      await sdk.registerTsTcWatcher(callback, { numBlocks: 20 });
       await vi.waitFor(() => {
         expect(callback).toHaveBeenCalled();
       });
@@ -236,12 +242,12 @@ describe('AlgoMetricsSDK', () => {
       sdk.unregisterTsTcWatcher(callback);
     });
 
-    it('re-register with same blockRange backfills missed blocks', async () => {
+    it('re-register with same numBlocks backfills missed blocks', async () => {
       const { sdk, algod, mockAbelGhostSDK } = createMockSDK(100n);
       const callback = vi.fn();
 
-      // Register with blockRange=10, wait for init
-      await sdk.registerTsTcWatcher(callback, 10);
+      // Register with numBlocks=10, wait for init
+      await sdk.registerTsTcWatcher(callback, { numBlocks: 10 });
       await vi.waitFor(() => {
         expect(callback).toHaveBeenCalled();
       });
@@ -263,8 +269,8 @@ describe('AlgoMetricsSDK', () => {
       callback.mockClear();
       mockAbelGhostSDK.getBlockTimesAndTc.mockClear();
 
-      // Re-register with the same blockRange
-      await sdk.registerTsTcWatcher(callback, 10);
+      // Re-register with the same numBlocks
+      await sdk.registerTsTcWatcher(callback, { numBlocks: 10 });
       await vi.waitFor(() => {
         expect(callback).toHaveBeenCalled();
       });
@@ -286,7 +292,7 @@ describe('AlgoMetricsSDK', () => {
       const { sdk } = createMockSDK(100n);
       const callback = vi.fn();
 
-      await sdk.registerTsTcWatcher(callback, 5);
+      await sdk.registerTsTcWatcher(callback, { numBlocks: 5 });
 
       await vi.waitFor(() => {
         expect(callback).toHaveBeenCalled();
@@ -298,6 +304,105 @@ describe('AlgoMetricsSDK', () => {
       // Wait a tick to confirm no more calls
       await new Promise((r) => setTimeout(r, 50));
       expect(callback.mock.calls.length).toBe(countAfterUnregister);
+    });
+  });
+
+  describe('includeBlock option', () => {
+    it('fetches with headerOnly(true) when no watcher needs blocks', async () => {
+      const { sdk, algod } = createMockSDK(100n);
+      const callback = vi.fn();
+
+      await sdk.registerTsTcWatcher(callback, { numBlocks: 5 });
+      await vi.waitFor(() => {
+        expect(callback).toHaveBeenCalled();
+      });
+
+      algod._resolveNextBlock();
+      await vi.waitFor(() => {
+        expect(callback.mock.calls.length).toBeGreaterThan(1);
+      });
+
+      expect(algod._headerOnlyCalls[0]).toBe(true);
+
+      sdk.unregisterTsTcWatcher(callback);
+    });
+
+    it('fetches with headerOnly(false) when a watcher needs blocks', async () => {
+      const { sdk, algod } = createMockSDK(100n);
+      const callback = vi.fn();
+
+      await sdk.registerTsTcWatcher(callback, { numBlocks: 5, includeBlock: true });
+      await vi.waitFor(() => {
+        expect(callback).toHaveBeenCalled();
+      });
+
+      algod._resolveNextBlock();
+      await vi.waitFor(() => {
+        expect(callback.mock.calls.length).toBeGreaterThan(1);
+      });
+
+      expect(algod._headerOnlyCalls[0]).toBe(false);
+
+      sdk.unregisterTsTcWatcher(callback);
+    });
+
+    it('delivers block response to includeBlock watchers on new blocks', async () => {
+      const { sdk, algod } = createMockSDK(100n);
+      const callback = vi.fn();
+
+      await sdk.registerTsTcWatcher(callback, { numBlocks: 5, includeBlock: true });
+      await vi.waitFor(() => {
+        expect(callback).toHaveBeenCalled();
+      });
+
+      // Initial delivery should NOT include a block
+      expect(callback.mock.calls[0]).toHaveLength(1);
+
+      algod._resolveNextBlock();
+      await vi.waitFor(() => {
+        expect(callback.mock.calls.length).toBeGreaterThan(1);
+      });
+
+      // Loop delivery SHOULD include the block response
+      const loopCall = callback.mock.calls[callback.mock.calls.length - 1]!;
+      expect(loopCall).toHaveLength(2);
+      const blockResp = loopCall[1] as { block: { header: { round: bigint } } };
+      expect(blockResp.block.header.round).toBe(101n);
+
+      sdk.unregisterTsTcWatcher(callback);
+    });
+
+    it('does not deliver block to simple watchers even when block is fetched', async () => {
+      const { sdk, algod } = createMockSDK(100n);
+      const simpleCallback = vi.fn();
+      const blockCallback = vi.fn();
+
+      await sdk.registerTsTcWatcher(simpleCallback, { numBlocks: 5 });
+      await sdk.registerTsTcWatcher(blockCallback, { numBlocks: 5, includeBlock: true });
+
+      await vi.waitFor(() => {
+        expect(simpleCallback).toHaveBeenCalled();
+        expect(blockCallback).toHaveBeenCalled();
+      });
+
+      algod._resolveNextBlock();
+      await vi.waitFor(() => {
+        expect(simpleCallback.mock.calls.length).toBeGreaterThan(1);
+      });
+
+      // Simple watcher: only gets data
+      const simpleCall = simpleCallback.mock.calls[simpleCallback.mock.calls.length - 1]!;
+      expect(simpleCall).toHaveLength(1);
+
+      // Block watcher: gets data + block
+      const blockCall = blockCallback.mock.calls[blockCallback.mock.calls.length - 1]!;
+      expect(blockCall).toHaveLength(2);
+
+      // Both fetched with headerOnly(false) since block watcher is present
+      expect(algod._headerOnlyCalls[0]).toBe(false);
+
+      sdk.unregisterTsTcWatcher(simpleCallback);
+      sdk.unregisterTsTcWatcher(blockCallback);
     });
   });
 });

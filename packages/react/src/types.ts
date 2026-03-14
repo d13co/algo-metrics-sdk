@@ -1,4 +1,8 @@
-import type { BlockRoundTimeAndTc, AlgoMetricsSDK, AlgoMetricsSDKOptions } from '@d13co/algo-metrics-sdk';
+import type {
+  BlockRoundTimeAndTc,
+  AlgoMetricsSDK,
+  AlgoMetricsSDKOptions,
+} from '@d13co/algo-metrics-sdk';
 
 export interface AlgoMetricsContextValue {
   data: BlockRoundTimeAndTc[] | null;
@@ -10,6 +14,5 @@ export interface AlgoMetricsContextValue {
 export interface AlgoMetricsProviderProps {
   options?: AlgoMetricsSDKOptions;
   sdk?: AlgoMetricsSDK;
-  isMainnet?: boolean;
   children: React.ReactNode;
 }

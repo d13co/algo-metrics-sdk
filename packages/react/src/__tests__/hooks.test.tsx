@@ -1,6 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
-import type { BlockRoundTimeAndTc, TsTcWatcherCallback, AlgoMetricsSDK } from '@d13co/algo-metrics-sdk';
+import type {
+  BlockRoundTimeAndTc,
+  TsTcWatcherSimpleCallback,
+  AlgoMetricsSDK,
+} from '@d13co/algo-metrics-sdk';
 import { AlgoMetricsProvider } from '../context.js';
 import {
   useLatestRound,
@@ -10,7 +14,18 @@ import {
   useBlockData,
   useAlgoMetricsContext,
 } from '../index.js';
-import { MAINNET_TC_OFFSET } from '../compute.js';
+import { MAINNET_TC_OFFSET, MAINNET_GENESIS_HASH } from '../compute.js';
+
+const TESTNET_GENESIS_HASH = 'SGO1GKSzyE7IEPItTxCByw9x8FmnrCDexi9/cOUJOiI=';
+
+function b64ToUint8Array(b64: string): Uint8Array {
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+}
 
 function block(rnd: number, ts = rnd, tc = rnd * 10): BlockRoundTimeAndTc {
   return { rnd: BigInt(rnd), ts, tc: BigInt(tc) };
@@ -21,16 +36,34 @@ const testBlocks = [block(1, 100, 1000), block(2, 103, 1050), block(3, 106, 1100
 interface MockSDK {
   registerTsTcWatcher: ReturnType<typeof vi.fn>;
   unregisterTsTcWatcher: ReturnType<typeof vi.fn>;
+  algorand: {
+    client: {
+      algod: {
+        getTransactionParams: ReturnType<typeof vi.fn>;
+      };
+    };
+  };
 }
 
-function createMockSDK() {
-  let capturedCallback: TsTcWatcherCallback | null = null;
+function createMockSDK(genesisHashB64 = MAINNET_GENESIS_HASH) {
+  let capturedCallback: TsTcWatcherSimpleCallback | null = null;
 
   const mock: MockSDK = {
-    registerTsTcWatcher: vi.fn(async (cb: TsTcWatcherCallback) => {
+    registerTsTcWatcher: vi.fn(async (cb: TsTcWatcherSimpleCallback) => {
       capturedCallback = cb;
     }),
     unregisterTsTcWatcher: vi.fn(),
+    algorand: {
+      client: {
+        algod: {
+          getTransactionParams: vi.fn(() => ({
+            do: vi.fn(async () => ({
+              genesisHash: b64ToUint8Array(genesisHashB64),
+            })),
+          })),
+        },
+      },
+    },
   };
 
   return {
@@ -44,13 +77,9 @@ function createMockSDK() {
   };
 }
 
-function createWrapper(sdk: AlgoMetricsSDK, isMainnet = true) {
+function createWrapper(sdk: AlgoMetricsSDK) {
   return function Wrapper({ children }: { children: React.ReactNode }) {
-    return (
-      <AlgoMetricsProvider sdk={sdk} isMainnet={isMainnet}>
-        {children}
-      </AlgoMetricsProvider>
-    );
+    return <AlgoMetricsProvider sdk={sdk}>{children}</AlgoMetricsProvider>;
   };
 }
 
@@ -90,6 +119,32 @@ describe('AlgoMetricsProvider', () => {
 
     expect(result.current.isLoading).toBe(false);
     expect(result.current.data).toEqual(testBlocks);
+  });
+
+  it('auto-detects mainnet from genesis hash', async () => {
+    const { sdk, emitBlocks } = createMockSDK(MAINNET_GENESIS_HASH);
+    const { result } = renderHook(() => useAlgoMetricsContext(), {
+      wrapper: createWrapper(sdk),
+    });
+
+    emitBlocks(testBlocks);
+
+    await vi.waitFor(() => {
+      expect(result.current.isMainnet).toBe(true);
+    });
+  });
+
+  it('auto-detects non-mainnet from genesis hash', async () => {
+    const { sdk, emitBlocks } = createMockSDK(TESTNET_GENESIS_HASH);
+    const { result } = renderHook(() => useAlgoMetricsContext(), {
+      wrapper: createWrapper(sdk),
+    });
+
+    emitBlocks(testBlocks);
+
+    await vi.waitFor(() => {
+      expect(result.current.isMainnet).toBe(false);
+    });
   });
 });
 
@@ -160,22 +215,28 @@ describe('useTransactionCount', () => {
     expect(result.current).toBeNull();
   });
 
-  it('applies mainnet offset when isMainnet is true', () => {
-    const { sdk, emitBlocks } = createMockSDK();
+  it('applies mainnet offset when connected to mainnet', async () => {
+    const { sdk, emitBlocks } = createMockSDK(MAINNET_GENESIS_HASH);
     const { result } = renderHook(() => useTransactionCount(), {
-      wrapper: createWrapper(sdk, true),
+      wrapper: createWrapper(sdk),
     });
     emitBlocks(testBlocks);
-    expect(result.current).toBe(1100n + MAINNET_TC_OFFSET);
+
+    await vi.waitFor(() => {
+      expect(result.current).toBe(1100n + MAINNET_TC_OFFSET);
+    });
   });
 
-  it('does not apply offset when isMainnet is false', () => {
-    const { sdk, emitBlocks } = createMockSDK();
+  it('does not apply offset when connected to testnet', async () => {
+    const { sdk, emitBlocks } = createMockSDK(TESTNET_GENESIS_HASH);
     const { result } = renderHook(() => useTransactionCount(), {
-      wrapper: createWrapper(sdk, false),
+      wrapper: createWrapper(sdk),
     });
     emitBlocks(testBlocks);
-    expect(result.current).toBe(1100n);
+
+    await vi.waitFor(() => {
+      expect(result.current).toBe(1100n);
+    });
   });
 });
 

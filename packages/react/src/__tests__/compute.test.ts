@@ -5,7 +5,9 @@ import {
   getAverageRoundTime,
   getTransactionsPerSecond,
   getTransactionCount,
+  isMainnetGenesisHash,
   MAINNET_TC_OFFSET,
+  MAINNET_GENESIS_HASH,
 } from '../compute.js';
 
 function block(rnd: number, ts = rnd, tc = rnd * 10): BlockRoundTimeAndTc {
@@ -73,5 +75,26 @@ describe('getTransactionCount', () => {
 describe('MAINNET_TC_OFFSET', () => {
   it('equals 563_279n', () => {
     expect(MAINNET_TC_OFFSET).toBe(563_279n);
+  });
+});
+
+describe('isMainnetGenesisHash', () => {
+  function b64ToUint8Array(b64: string): Uint8Array {
+    const binary = atob(b64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return bytes;
+  }
+
+  it('returns true for mainnet genesis hash', () => {
+    const hash = b64ToUint8Array(MAINNET_GENESIS_HASH);
+    expect(isMainnetGenesisHash(hash)).toBe(true);
+  });
+
+  it('returns false for a different genesis hash', () => {
+    const hash = b64ToUint8Array('SGO1GKSzyE7IEPItTxCByw9x8FmnrCDexi9/cOUJOiI=');
+    expect(isMainnetGenesisHash(hash)).toBe(false);
   });
 });

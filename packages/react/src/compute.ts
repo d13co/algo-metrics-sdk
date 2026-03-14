@@ -2,6 +2,13 @@ import type { BlockRoundTimeAndTc } from '@d13co/algo-metrics-sdk';
 
 export const MAINNET_TC_OFFSET = 563_279n;
 
+export const MAINNET_GENESIS_HASH = 'wGHE2Pwdvd7S12BL5FaOP20EGYesN73ktiC1qzkkit8=';
+
+export function isMainnetGenesisHash(genesisHash: Uint8Array): boolean {
+  const b64 = btoa(String.fromCharCode(...genesisHash));
+  return b64 === MAINNET_GENESIS_HASH;
+}
+
 export function getLatestRound(data: BlockRoundTimeAndTc[]): bigint | null {
   if (data.length === 0) return null;
   return data[data.length - 1]!.rnd;
