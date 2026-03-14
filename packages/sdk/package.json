@@ -12,10 +12,14 @@
       "types": "./dist/index.d.ts"
     }
   },
+  "publishConfig": {
+    "access": "public"
+  },
   "files": [
     "dist"
   ],
   "scripts": {
+    "prepublishOnly": "pnpm run build",
     "build": "tsc"
   },
   "license": "MIT",

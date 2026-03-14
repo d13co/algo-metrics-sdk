@@ -10,7 +10,8 @@
     "typecheck": "pnpm -r exec tsc --noEmit",
     "prepare": "husky",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "publish:all": "pnpm -r publish"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",
