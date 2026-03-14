@@ -34,8 +34,8 @@ function block(rnd: number, ts = rnd, tc = rnd * 10): BlockRoundTimeAndTc {
 const testBlocks = [block(1, 100, 1000), block(2, 103, 1050), block(3, 106, 1100)];
 
 interface MockSDK {
-  registerTsTcWatcher: ReturnType<typeof vi.fn>;
-  unregisterTsTcWatcher: ReturnType<typeof vi.fn>;
+  register: ReturnType<typeof vi.fn>;
+  unregister: ReturnType<typeof vi.fn>;
   algorand: {
     client: {
       algod: {
@@ -49,10 +49,10 @@ function createMockSDK(genesisHashB64 = MAINNET_GENESIS_HASH) {
   let capturedCallback: TsTcWatcherSimpleCallback | null = null;
 
   const mock: MockSDK = {
-    registerTsTcWatcher: vi.fn(async (cb: TsTcWatcherSimpleCallback) => {
+    register: vi.fn(async (cb: TsTcWatcherSimpleCallback) => {
       capturedCallback = cb;
     }),
-    unregisterTsTcWatcher: vi.fn(),
+    unregister: vi.fn(),
     algorand: {
       client: {
         algod: {
@@ -94,9 +94,9 @@ describe('AlgoMetricsProvider', () => {
       wrapper: createWrapper(sdk),
     });
 
-    expect(mock.registerTsTcWatcher).toHaveBeenCalledOnce();
+    expect(mock.register).toHaveBeenCalledOnce();
     unmount();
-    expect(mock.unregisterTsTcWatcher).toHaveBeenCalledOnce();
+    expect(mock.unregister).toHaveBeenCalledOnce();
   });
 
   it('starts in loading state with null data', () => {

@@ -114,10 +114,10 @@ describe('AlgoMetricsSDK', () => {
     });
   });
 
-  describe('registerTsTcWatcher / unregisterTsTcWatcher', () => {
+  describe('register / unregister', () => {
     it('throws if numBlocks > 1000', async () => {
       const { sdk } = createMockSDK(1000n);
-      await expect(sdk.registerTsTcWatcher(vi.fn(), { numBlocks: 1001 })).rejects.toThrow(
+      await expect(sdk.register(vi.fn(), { numBlocks: 1001 })).rejects.toThrow(
         'numBlocks must be <= 1000'
       );
     });
@@ -129,7 +129,7 @@ describe('AlgoMetricsSDK', () => {
         received.push(data);
       });
 
-      await sdk.registerTsTcWatcher(callback, { numBlocks: 10 });
+      await sdk.register(callback, { numBlocks: 10 });
 
       // Allow the async watcherLoop init to complete
       await vi.waitFor(() => {
@@ -139,7 +139,7 @@ describe('AlgoMetricsSDK', () => {
       expect(received[0]!.length).toBe(10);
       expect(received[0]![0]!.rnd).toBe(91n);
 
-      sdk.unregisterTsTcWatcher(callback);
+      sdk.unregister(callback);
     });
 
     it('delivers new block data on each block', async () => {
@@ -149,7 +149,7 @@ describe('AlgoMetricsSDK', () => {
         calls.push([...data]);
       });
 
-      await sdk.registerTsTcWatcher(callback, { numBlocks: 5 });
+      await sdk.register(callback, { numBlocks: 5 });
 
       await vi.waitFor(() => {
         expect(callback).toHaveBeenCalled();
@@ -167,7 +167,7 @@ describe('AlgoMetricsSDK', () => {
       const lastCall = calls[calls.length - 1]!;
       expect(lastCall[lastCall.length - 1]!.rnd).toBe(101n);
 
-      sdk.unregisterTsTcWatcher(callback);
+      sdk.unregister(callback);
     });
 
     it('defends against callback errors', async () => {
@@ -177,7 +177,7 @@ describe('AlgoMetricsSDK', () => {
         throw new Error('callback boom');
       });
 
-      await sdk.registerTsTcWatcher(badCallback, { numBlocks: 5 });
+      await sdk.register(badCallback, { numBlocks: 5 });
 
       await vi.waitFor(() => {
         expect(badCallback).toHaveBeenCalled();
@@ -188,7 +188,7 @@ describe('AlgoMetricsSDK', () => {
         expect.any(Error)
       );
 
-      sdk.unregisterTsTcWatcher(badCallback);
+      sdk.unregister(badCallback);
       errorSpy.mockRestore();
     });
 
@@ -197,13 +197,13 @@ describe('AlgoMetricsSDK', () => {
       const callback = vi.fn();
 
       // Register with numBlocks=5, wait for init
-      await sdk.registerTsTcWatcher(callback, { numBlocks: 5 });
+      await sdk.register(callback, { numBlocks: 5 });
       await vi.waitFor(() => {
         expect(callback).toHaveBeenCalled();
       });
 
       // Unregister — loop needs to exit
-      sdk.unregisterTsTcWatcher(callback);
+      sdk.unregister(callback);
 
       // Resolve the pending statusAfterBlock so the loop can see watchers.size === 0 and exit
       algod._resolveNextBlock(); // currentRound → 101
@@ -220,7 +220,7 @@ describe('AlgoMetricsSDK', () => {
       mockAbelGhostSDK.getBlockTimesAndTc.mockClear();
 
       // Re-register with a larger numBlocks — should backfill including missed blocks
-      await sdk.registerTsTcWatcher(callback, { numBlocks: 20 });
+      await sdk.register(callback, { numBlocks: 20 });
       await vi.waitFor(() => {
         expect(callback).toHaveBeenCalled();
       });
@@ -239,7 +239,7 @@ describe('AlgoMetricsSDK', () => {
       const firstRnd = received[0]!.rnd;
       expect(firstRnd).toBe(84n);
 
-      sdk.unregisterTsTcWatcher(callback);
+      sdk.unregister(callback);
     });
 
     it('re-register with same numBlocks backfills missed blocks', async () => {
@@ -247,7 +247,7 @@ describe('AlgoMetricsSDK', () => {
       const callback = vi.fn();
 
       // Register with numBlocks=10, wait for init
-      await sdk.registerTsTcWatcher(callback, { numBlocks: 10 });
+      await sdk.register(callback, { numBlocks: 10 });
       await vi.waitFor(() => {
         expect(callback).toHaveBeenCalled();
       });
@@ -258,7 +258,7 @@ describe('AlgoMetricsSDK', () => {
       expect(initLastRnd).toBe(100n);
 
       // Unregister and let the loop exit
-      sdk.unregisterTsTcWatcher(callback);
+      sdk.unregister(callback);
       algod._resolveNextBlock(); // currentRound → 101, unblocks loop to exit
       await new Promise((r) => setTimeout(r, 50));
 
@@ -270,7 +270,7 @@ describe('AlgoMetricsSDK', () => {
       mockAbelGhostSDK.getBlockTimesAndTc.mockClear();
 
       // Re-register with the same numBlocks
-      await sdk.registerTsTcWatcher(callback, { numBlocks: 10 });
+      await sdk.register(callback, { numBlocks: 10 });
       await vi.waitFor(() => {
         expect(callback).toHaveBeenCalled();
       });
@@ -285,20 +285,20 @@ describe('AlgoMetricsSDK', () => {
       expect(received[received.length - 1]!.rnd).toBe(103n);
       expect(received[0]!.rnd).toBe(94n);
 
-      sdk.unregisterTsTcWatcher(callback);
+      sdk.unregister(callback);
     });
 
     it('unregister removes callback', async () => {
       const { sdk } = createMockSDK(100n);
       const callback = vi.fn();
 
-      await sdk.registerTsTcWatcher(callback, { numBlocks: 5 });
+      await sdk.register(callback, { numBlocks: 5 });
 
       await vi.waitFor(() => {
         expect(callback).toHaveBeenCalled();
       });
 
-      sdk.unregisterTsTcWatcher(callback);
+      sdk.unregister(callback);
       const countAfterUnregister = callback.mock.calls.length;
 
       // Wait a tick to confirm no more calls
@@ -312,7 +312,7 @@ describe('AlgoMetricsSDK', () => {
       const { sdk, algod } = createMockSDK(100n);
       const callback = vi.fn();
 
-      await sdk.registerTsTcWatcher(callback, { numBlocks: 5 });
+      await sdk.register(callback, { numBlocks: 5 });
       await vi.waitFor(() => {
         expect(callback).toHaveBeenCalled();
       });
@@ -324,14 +324,14 @@ describe('AlgoMetricsSDK', () => {
 
       expect(algod._headerOnlyCalls[0]).toBe(true);
 
-      sdk.unregisterTsTcWatcher(callback);
+      sdk.unregister(callback);
     });
 
     it('fetches with headerOnly(false) when a watcher needs blocks', async () => {
       const { sdk, algod } = createMockSDK(100n);
       const callback = vi.fn();
 
-      await sdk.registerTsTcWatcher(callback, { numBlocks: 5, includeBlock: true });
+      await sdk.register(callback, { numBlocks: 5, includeBlock: true });
       await vi.waitFor(() => {
         expect(callback).toHaveBeenCalled();
       });
@@ -343,14 +343,14 @@ describe('AlgoMetricsSDK', () => {
 
       expect(algod._headerOnlyCalls[0]).toBe(false);
 
-      sdk.unregisterTsTcWatcher(callback);
+      sdk.unregister(callback);
     });
 
     it('delivers block response to includeBlock watchers on new blocks', async () => {
       const { sdk, algod } = createMockSDK(100n);
       const callback = vi.fn();
 
-      await sdk.registerTsTcWatcher(callback, { numBlocks: 5, includeBlock: true });
+      await sdk.register(callback, { numBlocks: 5, includeBlock: true });
       await vi.waitFor(() => {
         expect(callback).toHaveBeenCalled();
       });
@@ -369,7 +369,7 @@ describe('AlgoMetricsSDK', () => {
       const blockResp = loopCall[1] as { block: { header: { round: bigint } } };
       expect(blockResp.block.header.round).toBe(101n);
 
-      sdk.unregisterTsTcWatcher(callback);
+      sdk.unregister(callback);
     });
 
     it('does not deliver block to simple watchers even when block is fetched', async () => {
@@ -377,8 +377,8 @@ describe('AlgoMetricsSDK', () => {
       const simpleCallback = vi.fn();
       const blockCallback = vi.fn();
 
-      await sdk.registerTsTcWatcher(simpleCallback, { numBlocks: 5 });
-      await sdk.registerTsTcWatcher(blockCallback, { numBlocks: 5, includeBlock: true });
+      await sdk.register(simpleCallback, { numBlocks: 5 });
+      await sdk.register(blockCallback, { numBlocks: 5, includeBlock: true });
 
       await vi.waitFor(() => {
         expect(simpleCallback).toHaveBeenCalled();
@@ -401,8 +401,8 @@ describe('AlgoMetricsSDK', () => {
       // Both fetched with headerOnly(false) since block watcher is present
       expect(algod._headerOnlyCalls[0]).toBe(false);
 
-      sdk.unregisterTsTcWatcher(simpleCallback);
-      sdk.unregisterTsTcWatcher(blockCallback);
+      sdk.unregister(simpleCallback);
+      sdk.unregister(blockCallback);
     });
   });
 });

@@ -10,7 +10,7 @@ export function AlgoMetricsProvider({
   options,
   sdk: externalSdk,
   children,
-}: AlgoMetricsProviderProps): React.JSX.Element {
+}: AlgoMetricsProviderProps): React.ReactElement {
   const sdk = useMemo(() => externalSdk ?? new AlgoMetricsSDK(options), [externalSdk, options]);
 
   const [data, setData] = useState<BlockRoundTimeAndTc[] | null>(null);
@@ -41,10 +41,10 @@ export function AlgoMetricsProvider({
       setIsLoading(false);
     };
 
-    void sdk.registerTsTcWatcher(callback, { numBlocks: 1000 });
+    void sdk.register(callback, { numBlocks: 1000 });
 
     return (): void => {
-      sdk.unregisterTsTcWatcher(callback);
+      sdk.unregister(callback);
     };
   }, [sdk]);
 
@@ -53,7 +53,7 @@ export function AlgoMetricsProvider({
     [data, isLoading, sdk, isMainnet]
   );
 
-  return <AlgoMetricsContext value={value}>{children}</AlgoMetricsContext>;
+  return <AlgoMetricsContext.Provider value={value}>{children}</AlgoMetricsContext.Provider>;
 }
 
 export function useAlgoMetricsContext(): AlgoMetricsContextValue {

@@ -1,4 +1,3 @@
-import { useMemo } from 'react';
 import type { BlockRoundTimeAndTc } from '@d13co/algo-metrics-sdk';
 import { useAlgoMetricsContext } from './context.js';
 import {
@@ -10,22 +9,22 @@ import {
 
 export function useLatestRound(): bigint | null {
   const { data } = useAlgoMetricsContext();
-  return useMemo(() => (data ? getLatestRound(data) : null), [data]);
+  return data ? getLatestRound(data) : null;
 }
 
 export function useAverageRoundTime(): number | null {
   const { data } = useAlgoMetricsContext();
-  return useMemo(() => (data ? getAverageRoundTime(data) : null), [data]);
+  return data ? getAverageRoundTime(data) : null;
 }
 
 export function useTransactionsPerSecond(): number | null {
   const { data } = useAlgoMetricsContext();
-  return useMemo(() => (data ? getTransactionsPerSecond(data) : null), [data]);
+  return data ? getTransactionsPerSecond(data) : null;
 }
 
 export function useTransactionCount(): bigint | null {
   const { data, isMainnet } = useAlgoMetricsContext();
-  return useMemo(() => (data ? getTransactionCount(data, isMainnet) : null), [data, isMainnet]);
+  return data ? getTransactionCount(data, isMainnet) : null;
 }
 
 export function useBlockData(): BlockRoundTimeAndTc[] | null {

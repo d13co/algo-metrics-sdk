@@ -13,7 +13,7 @@ export type TsTcWatcherBlockCallback = (
 ) => void;
 export type TsTcWatcherCallback = TsTcWatcherSimpleCallback | TsTcWatcherBlockCallback;
 
-export type RegisterTsTcWatcherOptions =
+export type RegisterWatcherOptions =
   | { numBlocks?: number; includeBlock?: false }
   | { numBlocks?: number; includeBlock: true };
 
@@ -30,7 +30,7 @@ interface WatcherEntry {
  * Provides a sliding window of Algorand block timestamps and transaction counters.
  *
  * Supports one-shot fetches via {@link getTsTc} and live streaming via
- * {@link registerTsTcWatcher}/{@link unregisterTsTcWatcher}.
+ * {@link register}/{@link unregister}.
  */
 export class AlgoMetricsSDK {
   /** The Algorand client used for network calls. */
@@ -87,17 +87,17 @@ export class AlgoMetricsSDK {
    * @param options.includeBlock - When true, the callback receives the full `BlockResponse` as a second argument on each new block.
    * @throws If `numBlocks` exceeds 1000.
    */
-  async registerTsTcWatcher(
+  async register(
     callback: TsTcWatcherSimpleCallback,
     options?: { numBlocks?: number; includeBlock?: false }
   ): Promise<void>;
-  async registerTsTcWatcher(
+  async register(
     callback: TsTcWatcherBlockCallback,
     options: { numBlocks?: number; includeBlock: true }
   ): Promise<void>;
-  async registerTsTcWatcher(
+  async register(
     callback: TsTcWatcherCallback,
-    options: RegisterTsTcWatcherOptions = {}
+    options: RegisterWatcherOptions = {}
   ): Promise<void> {
     const { numBlocks = MAX_BLOCK_RANGE, includeBlock = false } = options;
     if (numBlocks > MAX_BLOCK_RANGE) {
@@ -137,9 +137,9 @@ export class AlgoMetricsSDK {
    * Unregisters a previously registered watcher callback.
    * Stops the watcher loop when no callbacks remain.
    *
-   * @param callback - The same function reference passed to {@link registerTsTcWatcher}.
+   * @param callback - The same function reference passed to {@link register}.
    */
-  unregisterTsTcWatcher(callback: TsTcWatcherCallback): void {
+  unregister(callback: TsTcWatcherCallback): void {
     this.watchers.delete(callback);
   }
 

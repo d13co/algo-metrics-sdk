@@ -20,10 +20,10 @@ function onBlockData(blocks: BlockRoundTimeAndTc[]): void {
 }
 
 // Watch a sliding window of numBlocks blocks
-await sdk.registerTsTcWatcher(onBlockData, { numBlocks });
+await sdk.register(onBlockData, { numBlocks });
 
 // Unregister after 30 seconds
 setTimeout(() => {
-  sdk.unregisterTsTcWatcher(onBlockData);
+  sdk.unregister(onBlockData);
   console.log('Watcher stopped');
 }, 30_000);

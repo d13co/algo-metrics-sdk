@@ -40,10 +40,10 @@ function onBlockData(blocks: BlockRoundTimeAndTc[]): void {
 }
 
 // Stream a sliding window of the last 200 blocks
-await sdk.registerTsTcWatcher(onBlockData, { numBlocks: 200 });
+await sdk.register(onBlockData, { numBlocks: 200 });
 
 // Stop watching when done
-sdk.unregisterTsTcWatcher(onBlockData);
+sdk.unregister(onBlockData);
 ```
 
 ### Custom Algorand client
@@ -72,7 +72,7 @@ Pass either `{ abelGhostSDK }`, `{ algorand?, ghostAppId? }`, or nothing to use 
 
 Fetches block timestamps and transaction counters for the most recent `blockRange` blocks (default and max: 1000).
 
-### `sdk.registerTsTcWatcher(callback, options?): Promise<void>`
+### `sdk.register(callback, options?): Promise<void>`
 
 Registers a callback that receives a sliding window of block data on every new block. The callback fires immediately with current data, then again as each new block arrives.
 
@@ -83,7 +83,7 @@ Registers a callback that receives a sliding window of block data on every new b
 
 When `includeBlock` is `true`, the callback type must be `(data, lastBlock) => void`. The initial delivery on registration does not include a block.
 
-### `sdk.unregisterTsTcWatcher(callback): void`
+### `sdk.unregister(callback): void`
 
 Removes a previously registered watcher. The internal loop stops when no watchers remain.
 

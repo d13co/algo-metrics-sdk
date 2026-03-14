@@ -1,6 +1,6 @@
 {
   "name": "@d13co/algo-metrics-sdk",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "type": "module",
   "description": "Sliding window of Algorand block timestamps and transaction counters",
   "main": "dist/index.js",
