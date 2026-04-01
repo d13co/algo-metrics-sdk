@@ -31,3 +31,8 @@ export function useBlockData(): BlockRoundTimeAndTc[] | null {
   const { data } = useAlgoMetricsContext();
   return data;
 }
+
+export function useOnlineStake(): bigint | null {
+  const { onlineStake } = useAlgoMetricsContext();
+  return onlineStake;
+}

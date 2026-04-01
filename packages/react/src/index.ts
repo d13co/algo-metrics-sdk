@@ -5,6 +5,7 @@ export {
   useTransactionsPerSecond,
   useTransactionCount,
   useBlockData,
+  useOnlineStake,
 } from './hooks.js';
 export {
   getLatestRound,

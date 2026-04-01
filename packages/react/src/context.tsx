@@ -16,6 +16,7 @@ export function AlgoMetricsProvider({
   const [data, setData] = useState<BlockRoundTimeAndTc[] | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isMainnet, setIsMainnet] = useState(true);
+  const [onlineStake, setOnlineStake] = useState<bigint | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -36,8 +37,9 @@ export function AlgoMetricsProvider({
   }, [sdk]);
 
   useEffect(() => {
-    const callback = (blocks: BlockRoundTimeAndTc[]): void => {
+    const callback = (blocks: BlockRoundTimeAndTc[], onlineStake: bigint | null): void => {
       setData(blocks);
+      setOnlineStake(onlineStake);
       setIsLoading(false);
     };
 
@@ -49,8 +51,8 @@ export function AlgoMetricsProvider({
   }, [sdk]);
 
   const value = useMemo(
-    (): AlgoMetricsContextValue => ({ data, isLoading, sdk, isMainnet }),
-    [data, isLoading, sdk, isMainnet]
+    (): AlgoMetricsContextValue => ({ data, isLoading, sdk, isMainnet, onlineStake }),
+    [data, isLoading, sdk, isMainnet, onlineStake]
   );
 
   return <AlgoMetricsContext.Provider value={value}>{children}</AlgoMetricsContext.Provider>;

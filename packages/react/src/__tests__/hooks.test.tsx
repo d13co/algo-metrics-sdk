@@ -12,6 +12,7 @@ import {
   useTransactionsPerSecond,
   useTransactionCount,
   useBlockData,
+  useOnlineStake,
   useAlgoMetricsContext,
 } from '../index.js';
 import { MAINNET_TC_OFFSET, MAINNET_GENESIS_HASH } from '../compute.js';
@@ -69,9 +70,9 @@ function createMockSDK(genesisHashB64 = MAINNET_GENESIS_HASH) {
   return {
     sdk: mock as unknown as AlgoMetricsSDK,
     mock,
-    emitBlocks: (blocks: BlockRoundTimeAndTc[]) => {
+    emitBlocks: (blocks: BlockRoundTimeAndTc[], onlineStake: bigint | null = null) => {
       act(() => {
-        capturedCallback?.(blocks);
+        capturedCallback?.(blocks, onlineStake);
       });
     },
   };
@@ -256,6 +257,25 @@ describe('useBlockData', () => {
     });
     emitBlocks(testBlocks);
     expect(result.current).toEqual(testBlocks);
+  });
+});
+
+describe('useOnlineStake', () => {
+  it('returns null before data arrives', () => {
+    const { sdk } = createMockSDK();
+    const { result } = renderHook(() => useOnlineStake(), {
+      wrapper: createWrapper(sdk),
+    });
+    expect(result.current).toBeNull();
+  });
+
+  it('returns online stake from callback', () => {
+    const { sdk, emitBlocks } = createMockSDK();
+    const { result } = renderHook(() => useOnlineStake(), {
+      wrapper: createWrapper(sdk),
+    });
+    emitBlocks(testBlocks, 5_000_000_000n);
+    expect(result.current).toBe(5_000_000_000n);
   });
 });
 

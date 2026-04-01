@@ -2,14 +2,24 @@ import { AlgorandClient } from '@algorandfoundation/algokit-utils';
 import { AbelGhostSDK } from 'abel-ghost-sdk';
 import type { BlockRoundTimeAndTc } from 'abel-ghost-sdk';
 import type { modelsv2 } from 'algosdk';
-import { delay, mergeIntoCache, MAX_BLOCK_RANGE, ERROR_RETRY_DELAY_MS } from './utils.js';
+import {
+  delay,
+  mergeIntoCache,
+  MAX_BLOCK_RANGE,
+  ERROR_RETRY_DELAY_MS,
+  STAKE_FETCH_INTERVAL,
+} from './utils.js';
 
 export type { BlockRoundTimeAndTc } from 'abel-ghost-sdk';
 
-export type TsTcWatcherSimpleCallback = (data: BlockRoundTimeAndTc[]) => void;
+export type TsTcWatcherSimpleCallback = (
+  data: BlockRoundTimeAndTc[],
+  onlineStake: bigint | null
+) => void;
 export type TsTcWatcherBlockCallback = (
   data: BlockRoundTimeAndTc[],
-  lastBlock: modelsv2.BlockResponse
+  lastBlock: modelsv2.BlockResponse,
+  onlineStake: bigint | null
 ) => void;
 export type TsTcWatcherCallback = TsTcWatcherSimpleCallback | TsTcWatcherBlockCallback;
 
@@ -41,6 +51,8 @@ export class AlgoMetricsSDK {
   private cache: BlockRoundTimeAndTc[] = [];
   private watchers: Map<TsTcWatcherCallback, WatcherEntry> = new Map();
   private watcherLoopRunning = false;
+  private _onlineStake: bigint | null = null;
+  private lastStakeRound = 0n;
 
   /**
    * @param options - Either an existing `abelGhostSDK` instance, or
@@ -57,6 +69,27 @@ export class AlgoMetricsSDK {
         algorand: this.algorand,
         ghostAppId: options.ghostAppId ?? 3381542955n,
       });
+    }
+  }
+
+  /** Returns the last fetched total online stake in microAlgos, or null if not yet fetched. */
+  getOnlineStake(): bigint | null {
+    return this._onlineStake;
+  }
+
+  private async fetchOnlineStake(round: bigint): Promise<void> {
+    try {
+      // Use raw JSON request to avoid algosdk msgpack decode issues with complex delta types
+      const req = this.algorand.client.algod.getLedgerStateDelta(round);
+      req.query.format = 'json';
+      const resp = await req.doRaw();
+      const json = JSON.parse(new TextDecoder().decode(resp)) as {
+        Totals: { online: { mon: number } };
+      };
+      this._onlineStake = BigInt(json.Totals.online.mon);
+      this.lastStakeRound = round;
+    } catch (err) {
+      console.error('AlgoMetricsSDK fetchOnlineStake error:', err);
     }
   }
 
@@ -126,7 +159,7 @@ export class AlgoMetricsSDK {
 
     if (this.cache.length > 0) {
       try {
-        (callback as TsTcWatcherSimpleCallback)(this.cache.slice(-numBlocks));
+        (callback as TsTcWatcherSimpleCallback)(this.cache.slice(-numBlocks), this._onlineStake);
       } catch (err) {
         console.error('AlgoMetricsSDK watcher callback error:', err);
       }
@@ -176,6 +209,8 @@ export class AlgoMetricsSDK {
         this.cache = this.cache.slice(-MAX_BLOCK_RANGE);
       }
 
+      await this.fetchOnlineStake(lastRound);
+
       this.deliverToWatchers();
 
       let latestRound = lastRound;
@@ -204,6 +239,10 @@ export class AlgoMetricsSDK {
             this.cache = this.cache.slice(-MAX_BLOCK_RANGE);
           }
 
+          if (newRound - this.lastStakeRound >= STAKE_FETCH_INTERVAL) {
+            await this.fetchOnlineStake(newRound);
+          }
+
           this.deliverToWatchers(blockResp);
           latestRound = newRound;
         } catch (err) {
@@ -224,9 +263,9 @@ export class AlgoMetricsSDK {
       try {
         const slice = this.cache.slice(-entry.numBlocks);
         if (entry.includeBlock && lastBlock) {
-          (callback as TsTcWatcherBlockCallback)(slice, lastBlock);
+          (callback as TsTcWatcherBlockCallback)(slice, lastBlock, this._onlineStake);
         } else {
-          (callback as TsTcWatcherSimpleCallback)(slice);
+          (callback as TsTcWatcherSimpleCallback)(slice, this._onlineStake);
         }
       } catch (err) {
         console.error('AlgoMetricsSDK watcher callback error:', err);

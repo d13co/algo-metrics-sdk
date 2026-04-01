@@ -46,6 +46,12 @@ function createMockAlgod(lastRound: bigint) {
         };
       },
     }),
+    getLedgerStateDelta: (_round: number | bigint) => ({
+      query: {} as Record<string, string>,
+      doRaw: vi.fn(async () =>
+        new TextEncoder().encode(JSON.stringify({ Totals: { online: { mon: 5000000000 } } }))
+      ),
+    }),
     // Test helpers
     _resolveNextBlock: () => {
       currentRound = currentRound + 1n;
@@ -355,17 +361,17 @@ describe('AlgoMetricsSDK', () => {
         expect(callback).toHaveBeenCalled();
       });
 
-      // Initial delivery should NOT include a block
-      expect(callback.mock.calls[0]).toHaveLength(1);
+      // Initial delivery should NOT include a block (data + onlineStake)
+      expect(callback.mock.calls[0]).toHaveLength(2);
 
       algod._resolveNextBlock();
       await vi.waitFor(() => {
         expect(callback.mock.calls.length).toBeGreaterThan(1);
       });
 
-      // Loop delivery SHOULD include the block response
+      // Loop delivery SHOULD include the block response (data + block + onlineStake)
       const loopCall = callback.mock.calls[callback.mock.calls.length - 1]!;
-      expect(loopCall).toHaveLength(2);
+      expect(loopCall).toHaveLength(3);
       const blockResp = loopCall[1] as { block: { header: { round: bigint } } };
       expect(blockResp.block.header.round).toBe(101n);
 
@@ -390,13 +396,13 @@ describe('AlgoMetricsSDK', () => {
         expect(simpleCallback.mock.calls.length).toBeGreaterThan(1);
       });
 
-      // Simple watcher: only gets data
+      // Simple watcher: gets data + onlineStake
       const simpleCall = simpleCallback.mock.calls[simpleCallback.mock.calls.length - 1]!;
-      expect(simpleCall).toHaveLength(1);
+      expect(simpleCall).toHaveLength(2);
 
-      // Block watcher: gets data + block
+      // Block watcher: gets data + block + onlineStake
       const blockCall = blockCallback.mock.calls[blockCallback.mock.calls.length - 1]!;
-      expect(blockCall).toHaveLength(2);
+      expect(blockCall).toHaveLength(3);
 
       // Both fetched with headerOnly(false) since block watcher is present
       expect(algod._headerOnlyCalls[0]).toBe(false);

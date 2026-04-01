@@ -2,6 +2,7 @@ import type { BlockRoundTimeAndTc } from 'abel-ghost-sdk';
 
 export const MAX_BLOCK_RANGE = 1000;
 export const ERROR_RETRY_DELAY_MS = 1000;
+export const STAKE_FETCH_INTERVAL = 10;
 
 export function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));

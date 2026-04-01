@@ -9,6 +9,7 @@ export interface AlgoMetricsContextValue {
   isLoading: boolean;
   sdk: AlgoMetricsSDK;
   isMainnet: boolean;
+  onlineStake: bigint | null;
 }
 
 export interface AlgoMetricsProviderProps {
