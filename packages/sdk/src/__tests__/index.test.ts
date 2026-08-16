@@ -58,6 +58,11 @@ function createMockAlgod(lastRound: bigint) {
       const resolver = statusAfterBlockResolvers.shift();
       resolver?.({ lastRound: currentRound });
     },
+    _advanceRounds: (n: number) => {
+      currentRound = currentRound + BigInt(n);
+      const resolver = statusAfterBlockResolvers.shift();
+      resolver?.({ lastRound: currentRound });
+    },
     _headerOnlyCalls: headerOnlyCalls,
   };
 }
@@ -310,6 +315,103 @@ describe('AlgoMetricsSDK', () => {
       // Wait a tick to confirm no more calls
       await new Promise((r) => setTimeout(r, 50));
       expect(callback.mock.calls.length).toBe(countAfterUnregister);
+    });
+  });
+
+  describe('gap backfill (suspended tab resume)', () => {
+    function expectContiguous(data: BlockRoundTimeAndTc[]): void {
+      for (let i = 1; i < data.length; i++) {
+        expect(data[i]!.rnd).toBe(data[i - 1]!.rnd + 1n);
+      }
+    }
+
+    it('backfills skipped rounds when statusAfterBlock jumps ahead', async () => {
+      const { sdk, algod, mockAbelGhostSDK } = createMockSDK(100n);
+      const calls: BlockRoundTimeAndTc[][] = [];
+      const callback = vi.fn((data: BlockRoundTimeAndTc[]) => {
+        calls.push([...data]);
+      });
+
+      await sdk.register(callback, { numBlocks: 10 });
+      await vi.waitFor(() => {
+        expect(callback).toHaveBeenCalled();
+      });
+
+      mockAbelGhostSDK.getBlockTimesAndTc.mockClear();
+      const initCallCount = callback.mock.calls.length;
+
+      // Simulate a tab resume: 5 rounds passed while suspended
+      algod._advanceRounds(5); // currentRound → 105
+
+      await vi.waitFor(() => {
+        expect(callback.mock.calls.length).toBeGreaterThan(initCallCount);
+      });
+
+      expect(mockAbelGhostSDK.getBlockTimesAndTc).toHaveBeenCalledWith(101n, 104n);
+
+      const received = calls[calls.length - 1]!;
+      expect(received).toHaveLength(10);
+      expect(received[0]!.rnd).toBe(96n);
+      expect(received[received.length - 1]!.rnd).toBe(105n);
+      expectContiguous(received);
+
+      sdk.unregister(callback);
+    });
+
+    it('clamps backfill to MAX_BLOCK_RANGE when the gap is larger', async () => {
+      const { sdk, algod, mockAbelGhostSDK } = createMockSDK(100n);
+      const calls: BlockRoundTimeAndTc[][] = [];
+      const callback = vi.fn((data: BlockRoundTimeAndTc[]) => {
+        calls.push([...data]);
+      });
+
+      await sdk.register(callback, { numBlocks: 10 });
+      await vi.waitFor(() => {
+        expect(callback).toHaveBeenCalled();
+      });
+
+      mockAbelGhostSDK.getBlockTimesAndTc.mockClear();
+      const initCallCount = callback.mock.calls.length;
+
+      // Gap of 2000 rounds — far more than the 1000-round reach of the ghost app
+      algod._advanceRounds(2000); // currentRound → 2100
+
+      await vi.waitFor(() => {
+        expect(callback.mock.calls.length).toBeGreaterThan(initCallCount);
+      });
+
+      expect(mockAbelGhostSDK.getBlockTimesAndTc).toHaveBeenCalledWith(1100n, 2099n);
+
+      const received = calls[calls.length - 1]!;
+      expect(received).toHaveLength(10);
+      expect(received[0]!.rnd).toBe(2091n);
+      expect(received[received.length - 1]!.rnd).toBe(2100n);
+      expectContiguous(received);
+
+      sdk.unregister(callback);
+    });
+
+    it('does not call the ghost SDK for a single-round advance', async () => {
+      const { sdk, algod, mockAbelGhostSDK } = createMockSDK(100n);
+      const callback = vi.fn();
+
+      await sdk.register(callback, { numBlocks: 10 });
+      await vi.waitFor(() => {
+        expect(callback).toHaveBeenCalled();
+      });
+
+      mockAbelGhostSDK.getBlockTimesAndTc.mockClear();
+      const initCallCount = callback.mock.calls.length;
+
+      algod._resolveNextBlock(); // currentRound → 101
+
+      await vi.waitFor(() => {
+        expect(callback.mock.calls.length).toBeGreaterThan(initCallCount);
+      });
+
+      expect(mockAbelGhostSDK.getBlockTimesAndTc).not.toHaveBeenCalled();
+
+      sdk.unregister(callback);
     });
   });
 

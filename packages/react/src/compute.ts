@@ -18,7 +18,10 @@ export function getAverageRoundTime(data: BlockRoundTimeAndTc[]): number | null 
   if (data.length < 2) return null;
   const first = data[0]!;
   const last = data[data.length - 1]!;
-  return (last.ts - first.ts) / (data.length - 1);
+  // Divide by the round span, not the entry count, so gaps in the data can't skew the average
+  const roundDiff = Number(last.rnd - first.rnd);
+  if (roundDiff === 0) return null;
+  return (last.ts - first.ts) / roundDiff;
 }
 
 export function getTransactionsPerSecond(data: BlockRoundTimeAndTc[]): number | null {

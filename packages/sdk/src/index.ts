@@ -229,6 +229,17 @@ export class AlgoMetricsSDK {
             .headerOnly(!needsBlock)
             .do();
 
+          // A suspended tab can resume with newRound far ahead of latestRound; backfill the
+          // skipped rounds so the cache stays contiguous. Clamped to MAX_BLOCK_RANGE because
+          // the ghost app's block opcode can't reach further back (and the cache caps there anyway).
+          if (newRound - latestRound > 1n) {
+            const oldestReachable = newRound - BigInt(MAX_BLOCK_RANGE);
+            const gapFirst =
+              latestRound + 1n > oldestReachable ? latestRound + 1n : oldestReachable;
+            const backfill = await this.abelGhostSDK.getBlockTimesAndTc(gapFirst, newRound - 1n);
+            this.cache = mergeIntoCache(this.cache, backfill);
+          }
+
           this.cache.push({
             rnd: blockResp.block.header.round,
             ts: Number(blockResp.block.header.timestamp),

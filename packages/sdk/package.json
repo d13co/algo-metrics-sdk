@@ -1,6 +1,6 @@
 {
   "name": "@d13co/algo-metrics-sdk",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "type": "module",
   "description": "Sliding window of Algorand block timestamps and transaction counters",
   "main": "dist/index.js",
@@ -20,7 +20,9 @@
   ],
   "scripts": {
     "prepublishOnly": "pnpm run build",
-    "build": "tsc"
+    "build": "tsc",
+    "test": "vitest run --config ../../vitest.config.ts",
+    "test:watch": "vitest --config ../../vitest.config.ts"
   },
   "license": "MIT",
   "repository": {

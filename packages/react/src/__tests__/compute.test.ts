@@ -30,7 +30,7 @@ describe('getAverageRoundTime', () => {
     expect(getAverageRoundTime([block(1)])).toBeNull();
   });
 
-  it('computes (last.ts - first.ts) / (length - 1)', () => {
+  it('computes (last.ts - first.ts) / (last.rnd - first.rnd)', () => {
     const data = [block(1, 100), block(2, 103), block(3, 106)];
     expect(getAverageRoundTime(data)).toBe(3);
   });
@@ -38,6 +38,17 @@ describe('getAverageRoundTime', () => {
   it('handles non-uniform timestamps', () => {
     const data = [block(1, 0), block(2, 2), block(3, 10)];
     expect(getAverageRoundTime(data)).toBe(5);
+  });
+
+  it('is not skewed by round gaps in the data', () => {
+    // 101 rounds elapsed over 303s, but only 3 entries present
+    const data = [block(1, 0), block(2, 3), block(102, 303)];
+    expect(getAverageRoundTime(data)).toBe(3);
+  });
+
+  it('returns null when the round span is zero', () => {
+    const data = [block(5, 100), block(5, 100)];
+    expect(getAverageRoundTime(data)).toBeNull();
   });
 });
 

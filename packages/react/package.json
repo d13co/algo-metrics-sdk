@@ -1,6 +1,6 @@
 {
   "name": "@d13co/algo-metrics-react",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "type": "module",
   "description": "React hooks for @d13co/algo-metrics-sdk",
   "main": "dist/index.js",
@@ -20,7 +20,9 @@
   ],
   "scripts": {
     "prepublishOnly": "pnpm run build",
-    "build": "tsc"
+    "build": "tsc",
+    "test": "vitest run --config ../../vitest.config.ts",
+    "test:watch": "vitest --config ../../vitest.config.ts"
   },
   "license": "MIT",
   "repository": {
